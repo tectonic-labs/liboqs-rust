@@ -414,6 +414,33 @@ impl Sig {
         Ok((pk, sk))
     }
 
+    /// Deterministically generate a new keypair from a seed
+    pub fn keypair_from_seed(&self, seed: &[u8]) -> Result<(PublicKey, SecretKey)> {
+        let sig = unsafe { self.sig.as_ref() };
+        let func = sig.keypair_from_seed.unwrap();
+        let mut pk = PublicKey {
+            bytes: Vec::with_capacity(sig.length_public_key),
+        };
+        let mut sk = SecretKey {
+            bytes: Vec::with_capacity(sig.length_secret_key),
+        };
+        let status = unsafe {
+            func(
+                pk.bytes.as_mut_ptr(),
+                sk.bytes.as_mut_ptr(),
+                seed.as_ptr(),
+                seed.len(),
+            )
+        };
+        // update the lengths of the vecs
+        unsafe {
+            pk.bytes.set_len(sig.length_public_key);
+            sk.bytes.set_len(sig.length_secret_key);
+        }
+        status_to_result(status)?;
+        Ok((pk, sk))
+    }
+
     /// Sign a message
     pub fn sign<'a, S: Into<SecretKeyRef<'a>>>(
         &self,

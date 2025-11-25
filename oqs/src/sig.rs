@@ -23,6 +23,9 @@ newtype_buffer!(PublicKey, PublicKeyRef);
 newtype_buffer!(SecretKey, SecretKeyRef);
 newtype_buffer!(Signature, SignatureRef);
 
+#[cfg(feature = "zeroize")]
+impl zeroize::ZeroizeOnDrop for SecretKey {}
+
 /// Message type
 pub type Message = [u8];
 /// Context string type

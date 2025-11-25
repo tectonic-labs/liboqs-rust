@@ -1,4 +1,3 @@
-
 #[cfg(feature = "falcon")]
 #[test]
 fn keypair_from_seed() {

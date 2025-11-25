@@ -5,7 +5,7 @@
 use alloc::vec::Vec;
 
 use core::ptr::NonNull;
-use core::str::FromStr;
+use std::str::FromStr;
 
 #[cfg(not(feature = "std"))]
 use cstr_core::CStr;
@@ -24,6 +24,15 @@ newtype_buffer!(SecretKey, SecretKeyRef);
 newtype_buffer!(Ciphertext, CiphertextRef);
 newtype_buffer!(SharedSecret, SharedSecretRef);
 newtype_buffer!(KeypairSeed, KeypairSeedRef);
+
+#[cfg(feature = "zeroize")]
+impl zeroize::ZeroizeOnDrop for SecretKey {}
+
+#[cfg(feature = "zeroize")]
+impl zeroize::ZeroizeOnDrop for SharedSecret {}
+
+#[cfg(feature = "zeroize")]
+impl zeroize::ZeroizeOnDrop for KeypairSeed {}
 
 macro_rules! implement_kems {
     { $(($feat: literal) $kem: ident: $oqs_id: ident),* $(,)? } => (
@@ -256,8 +265,8 @@ impl Drop for Kem {
     }
 }
 
-impl core::convert::TryFrom<Algorithm> for Kem {
-    type Error = crate::Error;
+impl TryFrom<Algorithm> for Kem {
+    type Error = Error;
     fn try_from(alg: Algorithm) -> Result<Kem> {
         Kem::new(alg)
     }

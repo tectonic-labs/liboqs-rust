@@ -171,7 +171,7 @@ fn probe_includedir() -> PathBuf {
     }
 
     println!("cargo:rerun-if-env-changed=LIBOQS_NO_VENDOR");
-    let force_no_vendor = std::env::var_os("LIBOQS_NO_VENDOR").map_or(false, |v| v != "0");
+    let force_no_vendor = std::env::var_os("LIBOQS_NO_VENDOR").is_some_and(|v| v != "0");
 
     let version = env!("CARGO_PKG_VERSION");
     let (_, liboqs_version) = version.split_once("+liboqs-").unwrap();

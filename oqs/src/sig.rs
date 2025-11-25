@@ -259,6 +259,10 @@ impl Algorithm {
     /// This is the same as the `to_id`, but as a safe Rust string.
     pub fn name(&self) -> &'static str {
         // SAFETY: The id from ffi must be a proper null terminated C string
+        // On WASM, c_char is u8, but on most platforms it's i8, so we need a cast
+        #[cfg(target_family = "wasm")]
+        let id = unsafe { CStr::from_ptr(self.to_id() as *const _) };
+        #[cfg(not(target_family = "wasm"))]
         let id = unsafe { CStr::from_ptr(self.to_id()) };
         id.to_str().expect("OQS algorithm names must be UTF-8")
     }
@@ -326,6 +330,10 @@ impl Sig {
     pub fn version(&self) -> &'static str {
         let sig = unsafe { self.sig.as_ref() };
         // SAFETY: The alg_version from ffi must be a proper null terminated C string
+        // On WASM, c_char is u8, but on most platforms it's i8, so we need a cast
+        #[cfg(target_family = "wasm")]
+        let cstr = unsafe { CStr::from_ptr(sig.alg_version as *const _) };
+        #[cfg(not(target_family = "wasm"))]
         let cstr = unsafe { CStr::from_ptr(sig.alg_version) };
         cstr.to_str()
             .expect("Algorithm version strings must be UTF-8")

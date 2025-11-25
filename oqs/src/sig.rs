@@ -23,6 +23,9 @@ newtype_buffer!(PublicKey, PublicKeyRef);
 newtype_buffer!(SecretKey, SecretKeyRef);
 newtype_buffer!(Signature, SignatureRef);
 
+#[cfg(feature = "zeroize")]
+impl zeroize::ZeroizeOnDrop for SecretKey {}
+
 /// Message type
 pub type Message = [u8];
 /// Context string type
@@ -202,11 +205,8 @@ implement_sigs! {
     ("cross") CrossRsdpg256Balanced: OQS_SIG_alg_cross_rsdpg_256_balanced,
     ("cross") CrossRsdpg256Fast: OQS_SIG_alg_cross_rsdpg_256_fast,
     ("cross") CrossRsdpg256Small: OQS_SIG_alg_cross_rsdpg_256_small,
-    ("dilithium") Dilithium2: OQS_SIG_alg_dilithium_2,
-    ("dilithium") Dilithium3: OQS_SIG_alg_dilithium_3,
-    ("dilithium") Dilithium5: OQS_SIG_alg_dilithium_5,
-    ("falcon") Falcon512: OQS_SIG_alg_falcon_512,
-    ("falcon") Falcon1024: OQS_SIG_alg_falcon_1024,
+    ("falcon") Falcon512: OQS_SIG_alg_falcon_padded_512,
+    ("falcon") Falcon1024: OQS_SIG_alg_falcon_padded_1024,
     ("mayo") Mayo1: OQS_SIG_alg_mayo_1,
     ("mayo") Mayo2: OQS_SIG_alg_mayo_2,
     ("mayo") Mayo3: OQS_SIG_alg_mayo_3,
@@ -259,6 +259,10 @@ impl Algorithm {
     /// This is the same as the `to_id`, but as a safe Rust string.
     pub fn name(&self) -> &'static str {
         // SAFETY: The id from ffi must be a proper null terminated C string
+        // On WASM, c_char is u8, but on most platforms it's i8, so we need a cast
+        #[cfg(target_family = "wasm")]
+        let id = unsafe { CStr::from_ptr(self.to_id() as *const _) };
+        #[cfg(not(target_family = "wasm"))]
         let id = unsafe { CStr::from_ptr(self.to_id()) };
         id.to_str().expect("OQS algorithm names must be UTF-8")
     }
@@ -298,7 +302,7 @@ impl std::fmt::Display for Algorithm {
     }
 }
 
-impl core::convert::TryFrom<Algorithm> for Sig {
+impl TryFrom<Algorithm> for Sig {
     type Error = crate::Error;
     fn try_from(alg: Algorithm) -> Result<Sig> {
         Sig::new(alg)
@@ -326,6 +330,10 @@ impl Sig {
     pub fn version(&self) -> &'static str {
         let sig = unsafe { self.sig.as_ref() };
         // SAFETY: The alg_version from ffi must be a proper null terminated C string
+        // On WASM, c_char is u8, but on most platforms it's i8, so we need a cast
+        #[cfg(target_family = "wasm")]
+        let cstr = unsafe { CStr::from_ptr(sig.alg_version as *const _) };
+        #[cfg(not(target_family = "wasm"))]
         let cstr = unsafe { CStr::from_ptr(sig.alg_version) };
         cstr.to_str()
             .expect("Algorithm version strings must be UTF-8")
@@ -405,6 +413,33 @@ impl Sig {
             bytes: Vec::with_capacity(sig.length_secret_key),
         };
         let status = unsafe { func(pk.bytes.as_mut_ptr(), sk.bytes.as_mut_ptr()) };
+        // update the lengths of the vecs
+        unsafe {
+            pk.bytes.set_len(sig.length_public_key);
+            sk.bytes.set_len(sig.length_secret_key);
+        }
+        status_to_result(status)?;
+        Ok((pk, sk))
+    }
+
+    /// Deterministically generate a new keypair from a seed
+    pub fn keypair_from_seed(&self, seed: &[u8]) -> Result<(PublicKey, SecretKey)> {
+        let sig = unsafe { self.sig.as_ref() };
+        let func = sig.keypair_from_seed.unwrap();
+        let mut pk = PublicKey {
+            bytes: Vec::with_capacity(sig.length_public_key),
+        };
+        let mut sk = SecretKey {
+            bytes: Vec::with_capacity(sig.length_secret_key),
+        };
+        let status = unsafe {
+            func(
+                pk.bytes.as_mut_ptr(),
+                sk.bytes.as_mut_ptr(),
+                seed.as_ptr(),
+                seed.len(),
+            )
+        };
         // update the lengths of the vecs
         unsafe {
             pk.bytes.set_len(sig.length_public_key);

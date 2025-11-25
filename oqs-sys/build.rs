@@ -2,7 +2,8 @@ use std::path::{Path, PathBuf};
 
 fn generate_bindings(includedir: &Path, headerfile: &str, allow_filter: &str, block_filter: &str) {
     let out_path = PathBuf::from(std::env::var("OUT_DIR").unwrap());
-    bindgen::Builder::default()
+    
+    let mut builder = bindgen::Builder::default()
         .clang_arg(format!("-I{}", includedir.display()))
         .header(
             includedir
@@ -10,7 +11,22 @@ fn generate_bindings(includedir: &Path, headerfile: &str, allow_filter: &str, bl
                 .join(format!("{headerfile}.h"))
                 .to_str()
                 .unwrap(),
-        )
+        );
+    
+    // Add Emscripten system headers for WASM targets
+    let target = std::env::var("TARGET").unwrap_or_default();
+    if target.starts_with("wasm32") {
+        if let Ok(emsdk) = std::env::var("EMSDK") {
+            // Add Emscripten system include paths
+            let emsdk_include = format!("{}/upstream/emscripten/cache/sysroot/include", emsdk);
+            builder = builder.clang_arg(format!("-I{}", emsdk_include));
+            
+            // Set the target for clang
+            builder = builder.clang_arg("--target=wasm32-unknown-emscripten");
+        }
+    }
+    
+    builder
         // Options
         .default_enum_style(bindgen::EnumVariation::Rust {
             non_exhaustive: false,
@@ -42,6 +58,30 @@ fn build_from_source() -> PathBuf {
     let mut config = cmake::Config::new("liboqs");
     config.profile("Release");
     config.define("OQS_BUILD_ONLY_LIB", "Yes");
+
+    // Detect WASM target and configure for Emscripten
+    let target = std::env::var("TARGET").unwrap_or_default();
+    let is_wasm = target.starts_with("wasm32");
+    
+    if is_wasm {
+        // Use Ninja generator as recommended for Emscripten
+        // (emcmake cmake -GNinja ...)
+        config.generator("Ninja");
+        
+        // Set Emscripten toolchain file if EMSDK is available
+        if let Ok(emsdk) = std::env::var("EMSDK") {
+            let toolchain = format!("{}/upstream/emscripten/cmake/Modules/Platform/Emscripten.cmake", emsdk);
+            config.define("CMAKE_TOOLCHAIN_FILE", &toolchain);
+        }
+        
+        // Force OpenSSL OFF for WASM (as per liboqs issue #1199)
+        config.define("OQS_USE_OPENSSL", "OFF");
+        
+        // Permit unsupported architecture for WASM
+        config.define("OQS_PERMIT_UNSUPPORTED_ARCHITECTURE", "ON");
+        
+        println!("cargo:warning=Building for WASM with Emscripten");
+    }
 
     if cfg!(feature = "non_portable") {
         // Build with CPU feature detection or just enable whatever is available for this CPU
@@ -90,7 +130,8 @@ fn build_from_source() -> PathBuf {
     }
 
     // link the openssl libcrypto
-    if cfg!(any(feature = "openssl", feature = "vendored_openssl")) {
+    // Skip OpenSSL for WASM builds as it's not compatible
+    if !is_wasm && cfg!(any(feature = "openssl", feature = "vendored_openssl")) {
         config.define("OQS_USE_OPENSSL", "Yes");
         if cfg!(windows) {
             // Windows doesn't prefix with lib
@@ -103,14 +144,15 @@ fn build_from_source() -> PathBuf {
     }
 
     // let the linker know where to search for openssl libcrypto
-    if cfg!(feature = "vendored_openssl") {
+    // Skip OpenSSL configuration for WASM builds
+    if !is_wasm && cfg!(feature = "vendored_openssl") {
         // DEP_OPENSSL_ROOT is set by openssl-sys if a vendored build was used.
         // We point CMake towards this so that the vendored openssl is preferred
         // over the system openssl.
         let vendored_openssl_root = std::env::var("DEP_OPENSSL_ROOT")
             .expect("The `vendored_openssl` feature was enabled, but DEP_OPENSSL_ROOT was not set");
         config.define("OPENSSL_ROOT_DIR", vendored_openssl_root);
-    } else if cfg!(feature = "openssl") {
+    } else if !is_wasm && cfg!(feature = "openssl") {
         println!("cargo:rerun-if-env-changed=OPENSSL_ROOT_DIR");
         if let Ok(dir) = std::env::var("OPENSSL_ROOT_DIR") {
             let dir = Path::new(&dir).join("lib");
@@ -171,7 +213,7 @@ fn probe_includedir() -> PathBuf {
     }
 
     println!("cargo:rerun-if-env-changed=LIBOQS_NO_VENDOR");
-    let force_no_vendor = std::env::var_os("LIBOQS_NO_VENDOR").map_or(false, |v| v != "0");
+    let force_no_vendor = std::env::var_os("LIBOQS_NO_VENDOR").is_some_and(|v| v != "0");
 
     let version = env!("CARGO_PKG_VERSION");
     let (_, liboqs_version) = version.split_once("+liboqs-").unwrap();

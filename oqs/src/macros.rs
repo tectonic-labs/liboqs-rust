@@ -10,9 +10,30 @@ macro_rules! newtype_buffer {
         ///
         /// Optional support for `serde` if that feature is enabled.
         #[derive(Debug, Clone, PartialEq, Eq)]
-        #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+        #[cfg_attr(feature = "zeroize", derive(zeroize::Zeroize))]
         pub struct $name {
             bytes: Vec<u8>,
+        }
+
+        #[cfg(feature = "serde")]
+        impl serde::Serialize for $name {
+            fn serialize<S>(&self, s: S) -> core::result::Result<S::Ok, S::Error>
+            where
+                S: serde::Serializer,
+            {
+                serdect::slice::serialize_hex_lower_or_bin(&self.bytes, s)
+            }
+        }
+
+        #[cfg(feature = "serde")]
+        impl<'de> serde::Deserialize<'de> for $name {
+            fn deserialize<D>(d: D) -> core::result::Result<Self, D::Error>
+            where
+                D: serde::Deserializer<'de>,
+            {
+                let bytes = serdect::slice::deserialize_hex_or_bin_vec(d)?;
+                Ok($name { bytes })
+            }
         }
 
         impl $name {
@@ -85,10 +106,6 @@ mod test {
     use alloc::vec;
     use alloc::vec::Vec;
 
-    // necessary for newtype_buffer call
-    #[cfg(feature = "serde")]
-    use serde::{Deserialize, Serialize};
-
     newtype_buffer!(TestBuf, TestBufRef);
 
     #[test]
@@ -96,7 +113,7 @@ mod test {
         let buf = TestBuf {
             bytes: vec![1, 2, 3],
         };
-        assert_eq!(buf.bytes.as_ref() as &[u8], buf.as_ref());
+        assert_eq!(buf.bytes.as_slice(), buf.as_ref());
     }
 
     #[test]

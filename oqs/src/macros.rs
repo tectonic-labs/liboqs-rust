@@ -17,7 +17,7 @@ macro_rules! newtype_buffer {
 
         #[cfg(feature = "serde")]
         impl serde::Serialize for $name {
-            fn serialize<S>(&self, s: S) -> std::result::Result<S::Ok, S::Error>
+            fn serialize<S>(&self, s: S) -> core::result::Result<S::Ok, S::Error>
             where
                 S: serde::Serializer,
             {
@@ -27,7 +27,7 @@ macro_rules! newtype_buffer {
 
         #[cfg(feature = "serde")]
         impl<'de> serde::Deserialize<'de> for $name {
-            fn deserialize<D>(d: D) -> std::result::Result<Self, D::Error>
+            fn deserialize<D>(d: D) -> core::result::Result<Self, D::Error>
             where
                 D: serde::Deserializer<'de>,
             {

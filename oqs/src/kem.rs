@@ -5,7 +5,7 @@
 use alloc::vec::Vec;
 
 use core::ptr::NonNull;
-use std::str::FromStr;
+use core::str::FromStr;
 
 #[cfg(not(feature = "std"))]
 use cstr_core::CStr;

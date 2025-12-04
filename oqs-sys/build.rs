@@ -2,7 +2,7 @@ use std::path::{Path, PathBuf};
 
 fn generate_bindings(includedir: &Path, headerfile: &str, allow_filter: &str, block_filter: &str) {
     let out_path = PathBuf::from(std::env::var("OUT_DIR").unwrap());
-    
+
     let mut builder = bindgen::Builder::default()
         .clang_arg(format!("-I{}", includedir.display()))
         .header(
@@ -12,7 +12,7 @@ fn generate_bindings(includedir: &Path, headerfile: &str, allow_filter: &str, bl
                 .to_str()
                 .unwrap(),
         );
-    
+
     // Add Emscripten system headers for WASM targets
     let target = std::env::var("TARGET").unwrap_or_default();
     if target.starts_with("wasm32") {
@@ -20,12 +20,12 @@ fn generate_bindings(includedir: &Path, headerfile: &str, allow_filter: &str, bl
             // Add Emscripten system include paths
             let emsdk_include = format!("{}/upstream/emscripten/cache/sysroot/include", emsdk);
             builder = builder.clang_arg(format!("-I{}", emsdk_include));
-            
+
             // Set the target for clang
             builder = builder.clang_arg("--target=wasm32-unknown-emscripten");
         }
     }
-    
+
     builder
         // Options
         .default_enum_style(bindgen::EnumVariation::Rust {
@@ -62,24 +62,27 @@ fn build_from_source() -> PathBuf {
     // Detect WASM target and configure for Emscripten
     let target = std::env::var("TARGET").unwrap_or_default();
     let is_wasm = target.starts_with("wasm32");
-    
+
     if is_wasm {
         // Use Ninja generator as recommended for Emscripten
         // (emcmake cmake -GNinja ...)
         config.generator("Ninja");
-        
+
         // Set Emscripten toolchain file if EMSDK is available
         if let Ok(emsdk) = std::env::var("EMSDK") {
-            let toolchain = format!("{}/upstream/emscripten/cmake/Modules/Platform/Emscripten.cmake", emsdk);
+            let toolchain = format!(
+                "{}/upstream/emscripten/cmake/Modules/Platform/Emscripten.cmake",
+                emsdk
+            );
             config.define("CMAKE_TOOLCHAIN_FILE", &toolchain);
         }
-        
+
         // Force OpenSSL OFF for WASM (as per liboqs issue #1199)
         config.define("OQS_USE_OPENSSL", "OFF");
-        
+
         // Permit unsupported architecture for WASM
         config.define("OQS_PERMIT_UNSUPPORTED_ARCHITECTURE", "ON");
-        
+
         println!("cargo:warning=Building for WASM with Emscripten");
     }
 

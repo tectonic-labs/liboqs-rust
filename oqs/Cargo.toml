@@ -47,3 +47,6 @@ mayo = ["oqs-sys/mayo"]
 ml_dsa = ["oqs-sys/ml_dsa"]
 sphincs = ["oqs-sys/sphincs"]
 uov = ["oqs-sys/uov"]
+
+[dev-dependencies]
+rstest = "0.26"

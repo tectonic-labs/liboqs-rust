@@ -91,6 +91,8 @@ pub enum Error {
     InvalidLength,
     /// Error while trying to parse string to an algorithm
     AlgorithmParsingError,
+    /// A string error
+    String(&'static str),
 }
 #[cfg(feature = "std")]
 impl std::error::Error for Error {}

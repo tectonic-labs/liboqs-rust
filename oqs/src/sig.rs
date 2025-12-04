@@ -425,7 +425,9 @@ impl Sig {
     /// Deterministically generate a new keypair from a seed
     pub fn keypair_from_seed(&self, seed: &[u8]) -> Result<(PublicKey, SecretKey)> {
         let sig = unsafe { self.sig.as_ref() };
-        let func = sig.keypair_from_seed.unwrap();
+        let func = sig
+            .keypair_from_seed
+            .ok_or_else(|| Error::String("keypair_from_seed is not implemented"))?;
         let mut pk = PublicKey {
             bytes: Vec::with_capacity(sig.length_public_key),
         };

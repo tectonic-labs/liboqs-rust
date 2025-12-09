@@ -1,3 +1,4 @@
 [submodule "oqs-sys/liboqs"]
 	path = oqs-sys/liboqs
 	url = https://github.com/tectonic-labs/liboqs.git
+    branch = mceliece-derand

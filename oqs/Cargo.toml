@@ -49,4 +49,5 @@ sphincs = ["oqs-sys/sphincs"]
 uov = ["oqs-sys/uov"]
 
 [dev-dependencies]
+hex = "0.4"
 rstest = "0.26"

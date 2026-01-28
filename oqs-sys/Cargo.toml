@@ -1,12 +1,12 @@
 [package]
-name = "oqs-sys"
+name = "tectonic-oqs-sys"
 version = "0.11.0+liboqs-0.13.0"
 authors = ["Thom Wiggers <thom@thomwiggers.nl>"]
 edition = "2021"
 links = "oqs"
 description = "Bindings to liboqs"
 readme = "../README.md"
-repository = "https://github.com/open-quantum-safe/liboqs-rust"
+repository = "https://github.com/tectonic-labs/liboqs-rust"
 license = "MIT OR Apache-2.0"
 
 # Exclude certain liboqs files

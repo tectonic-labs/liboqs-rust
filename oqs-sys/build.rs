@@ -1,19 +1,13 @@
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
-/// Parses the .gitmodules file to extract the URL and branch for the liboqs submodule.
-/// Returns (url, branch) tuple.
-fn parse_gitmodules() -> (String, String) {
+/// Tries to parse the .gitmodules file to extract the URL and branch for the liboqs submodule.
+/// Returns Some((url, branch)) if successful, None otherwise.
+fn try_parse_gitmodules() -> Option<(String, String)> {
     let manifest_dir = PathBuf::from(std::env::var("CARGO_MANIFEST_DIR").unwrap());
-    let gitmodules_path = manifest_dir.parent().unwrap().join(".gitmodules");
+    let gitmodules_path = manifest_dir.parent()?.join(".gitmodules");
 
-    let contents = std::fs::read_to_string(&gitmodules_path).unwrap_or_else(|e| {
-        panic!(
-            "Failed to read .gitmodules at {}: {}",
-            gitmodules_path.display(),
-            e
-        )
-    });
+    let contents = std::fs::read_to_string(&gitmodules_path).ok()?;
 
     let mut url = None;
     let mut branch = None;
@@ -40,10 +34,56 @@ fn parse_gitmodules() -> (String, String) {
         }
     }
 
-    let url = url.expect("Could not find 'url' for liboqs submodule in .gitmodules");
+    let url = url?;
     let branch = branch.unwrap_or_else(|| "main".to_string());
 
+    Some((url, branch))
+}
+
+/// Parses [package.metadata.liboqs] from Cargo.toml to get URL and branch.
+/// This is used when .gitmodules is not available (e.g., crates.io builds).
+fn parse_cargo_metadata() -> (String, String) {
+    let manifest_dir = PathBuf::from(std::env::var("CARGO_MANIFEST_DIR").unwrap());
+    let cargo_toml_path = manifest_dir.join("Cargo.toml");
+
+    let contents = std::fs::read_to_string(&cargo_toml_path)
+        .expect("Failed to read Cargo.toml");
+
+    let mut url = None;
+    let mut branch = None;
+    let mut in_metadata_section = false;
+
+    for line in contents.lines() {
+        let line = line.trim();
+        if line == "[package.metadata.liboqs]" {
+            in_metadata_section = true;
+            continue;
+        }
+        if line.starts_with('[') {
+            in_metadata_section = false;
+            continue;
+        }
+        if in_metadata_section {
+            if let Some(value) = line.strip_prefix("url = ").or_else(|| line.strip_prefix("url=")) {
+                url = Some(value.trim().trim_matches('"').to_string());
+            } else if let Some(value) =
+                line.strip_prefix("branch = ").or_else(|| line.strip_prefix("branch="))
+            {
+                branch = Some(value.trim().trim_matches('"').to_string());
+            }
+        }
+    }
+
+    let url = url.expect("Could not find 'url' in [package.metadata.liboqs] in Cargo.toml");
+    let branch = branch.expect("Could not find 'branch' in [package.metadata.liboqs] in Cargo.toml");
+
     (url, branch)
+}
+
+/// Gets the liboqs repository URL and branch.
+/// First tries .gitmodules (local development), then falls back to Cargo.toml metadata (crates.io).
+fn get_liboqs_repo_info() -> (String, String) {
+    try_parse_gitmodules().unwrap_or_else(parse_cargo_metadata)
 }
 
 /// Returns the path to liboqs source, downloading it to OUT_DIR if necessary.
@@ -73,8 +113,8 @@ fn get_liboqs_source_dir() -> PathBuf {
         std::fs::remove_dir_all(&liboqs_dir).ok();
     }
 
-    // Get URL and branch from .gitmodules
-    let (repo_url, branch) = parse_gitmodules();
+    // Get URL and branch from .gitmodules or Cargo.toml metadata
+    let (repo_url, branch) = get_liboqs_repo_info();
 
     // Clone the repository
     let status = Command::new("git")

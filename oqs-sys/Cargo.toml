@@ -1,6 +1,6 @@
 [package]
 name = "tectonic-oqs-sys"
-version = "0.11.0+liboqs-0.13.0"
+version = "0.11.1+liboqs-0.13.0"
 authors = ["Thom Wiggers <thom@thomwiggers.nl>"]
 edition = "2021"
 links = "oqs"
@@ -49,6 +49,10 @@ mayo = []
 ml_dsa = []
 sphincs = []
 uov = []
+
+[package.metadata.liboqs]
+url = "https://github.com/tectonic-labs/liboqs.git"
+branch = "main"
 
 [package.metadata.docs.rs]
 features = ["docs"]

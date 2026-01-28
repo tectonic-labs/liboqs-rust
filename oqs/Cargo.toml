@@ -19,7 +19,7 @@ zeroize = { version = "1.8", features = ["derive"], optional = true }
 [dependencies.oqs-sys]
 package = "tectonic-oqs-sys"
 path = "../oqs-sys"
-version = "0.11.0"
+version = "0.11.1"
 default-features = false
 
 [features]

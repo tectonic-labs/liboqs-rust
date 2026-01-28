@@ -1,4 +1,102 @@
 use std::path::{Path, PathBuf};
+use std::process::Command;
+
+/// Parses the .gitmodules file to extract the URL and branch for the liboqs submodule.
+/// Returns (url, branch) tuple.
+fn parse_gitmodules() -> (String, String) {
+    let manifest_dir = PathBuf::from(std::env::var("CARGO_MANIFEST_DIR").unwrap());
+    let gitmodules_path = manifest_dir.parent().unwrap().join(".gitmodules");
+
+    let contents = std::fs::read_to_string(&gitmodules_path).unwrap_or_else(|e| {
+        panic!(
+            "Failed to read .gitmodules at {}: {}",
+            gitmodules_path.display(),
+            e
+        )
+    });
+
+    let mut url = None;
+    let mut branch = None;
+    let mut in_liboqs_section = false;
+
+    for line in contents.lines() {
+        let line = line.trim();
+        if line.starts_with("[submodule") && line.contains("liboqs") {
+            in_liboqs_section = true;
+            continue;
+        }
+        if line.starts_with('[') {
+            in_liboqs_section = false;
+            continue;
+        }
+        if in_liboqs_section {
+            if let Some(value) = line.strip_prefix("url = ").or_else(|| line.strip_prefix("url=")) {
+                url = Some(value.trim().to_string());
+            } else if let Some(value) =
+                line.strip_prefix("branch = ").or_else(|| line.strip_prefix("branch="))
+            {
+                branch = Some(value.trim().to_string());
+            }
+        }
+    }
+
+    let url = url.expect("Could not find 'url' for liboqs submodule in .gitmodules");
+    let branch = branch.unwrap_or_else(|| "main".to_string());
+
+    (url, branch)
+}
+
+/// Returns the path to liboqs source, downloading it to OUT_DIR if necessary.
+/// When building from crates.io, the submodule isn't included so we download it.
+/// For local development with the submodule, we use the local copy.
+fn get_liboqs_source_dir() -> PathBuf {
+    let local_liboqs = Path::new("liboqs");
+
+    // If local submodule exists and has content, use it
+    if local_liboqs.join("CMakeLists.txt").exists() {
+        return local_liboqs.to_path_buf();
+    }
+
+    // Otherwise, download to OUT_DIR
+    let out_dir = PathBuf::from(std::env::var("OUT_DIR").unwrap());
+    let liboqs_dir = out_dir.join("liboqs-src");
+
+    // Check if already downloaded
+    if liboqs_dir.join("CMakeLists.txt").exists() {
+        return liboqs_dir;
+    }
+
+    println!("cargo:warning=liboqs source not found, downloading from git...");
+
+    // Remove the directory if it exists but is empty/incomplete
+    if liboqs_dir.exists() {
+        std::fs::remove_dir_all(&liboqs_dir).ok();
+    }
+
+    // Get URL and branch from .gitmodules
+    let (repo_url, branch) = parse_gitmodules();
+
+    // Clone the repository
+    let status = Command::new("git")
+        .args([
+            "clone",
+            "--depth",
+            "1",
+            "--branch",
+            &branch,
+            &repo_url,
+            liboqs_dir.to_str().unwrap(),
+        ])
+        .status()
+        .expect("Failed to execute git clone. Make sure git is installed.");
+
+    if !status.success() {
+        panic!("Failed to clone liboqs repository");
+    }
+
+    println!("cargo:warning=liboqs source downloaded successfully");
+    liboqs_dir
+}
 
 fn generate_bindings(includedir: &Path, headerfile: &str, allow_filter: &str, block_filter: &str) {
     let out_path = PathBuf::from(std::env::var("OUT_DIR").unwrap());
@@ -54,8 +152,8 @@ fn generate_bindings(includedir: &Path, headerfile: &str, allow_filter: &str, bl
         .expect("Couldn't write bindings!");
 }
 
-fn build_from_source() -> PathBuf {
-    let mut config = cmake::Config::new("liboqs");
+fn build_from_source(liboqs_src: &Path) -> PathBuf {
+    let mut config = cmake::Config::new(liboqs_src);
     config.profile("Release");
     config.define("OQS_BUILD_ONLY_LIB", "Yes");
 
@@ -206,7 +304,8 @@ fn build_from_source() -> PathBuf {
 }
 
 fn includedir_from_source() -> PathBuf {
-    let outdir = build_from_source();
+    let liboqs_src = get_liboqs_source_dir();
+    let outdir = build_from_source(&liboqs_src);
     outdir.join("include")
 }
 
@@ -257,8 +356,10 @@ fn main() {
     gen_bindings("kem", "OQS_KEM.*", "");
     gen_bindings("sig", "OQS_SIG.*", "OQS_SIG_STFL.*");
 
-    // https://docs.rs/build-deps/0.1.4/build_deps/fn.rerun_if_changed_paths.html
-    build_deps::rerun_if_changed_paths("liboqs/src/**/*").unwrap();
-    build_deps::rerun_if_changed_paths("liboqs/src").unwrap();
-    build_deps::rerun_if_changed_paths("liboqs/src/*").unwrap();
+    // Only watch for changes if local submodule exists (not when downloaded)
+    if Path::new("liboqs/CMakeLists.txt").exists() {
+        build_deps::rerun_if_changed_paths("liboqs/src/**/*").unwrap();
+        build_deps::rerun_if_changed_paths("liboqs/src").unwrap();
+        build_deps::rerun_if_changed_paths("liboqs/src/*").unwrap();
+    }
 }

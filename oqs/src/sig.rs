@@ -214,6 +214,18 @@ implement_sigs! {
     ("ml_dsa") MlDsa44: OQS_SIG_alg_ml_dsa_44,
     ("ml_dsa") MlDsa65: OQS_SIG_alg_ml_dsa_65,
     ("ml_dsa") MlDsa87: OQS_SIG_alg_ml_dsa_87,
+    ("slh_dsa") SlhDsaPureSha2128s: OQS_SIG_alg_slh_dsa_pure_sha2_128s,
+    ("slh_dsa") SlhDsaPureSha2128f: OQS_SIG_alg_slh_dsa_pure_sha2_128f,
+    ("slh_dsa") SlhDsaPureSha2192s: OQS_SIG_alg_slh_dsa_pure_sha2_192s,
+    ("slh_dsa") SlhDsaPureSha2192f: OQS_SIG_alg_slh_dsa_pure_sha2_192f,
+    ("slh_dsa") SlhDsaPureSha2256s: OQS_SIG_alg_slh_dsa_pure_sha2_256s,
+    ("slh_dsa") SlhDsaPureSha2256f: OQS_SIG_alg_slh_dsa_pure_sha2_256f,
+    ("slh_dsa") SlhDsaPureShake128s: OQS_SIG_alg_slh_dsa_pure_shake_128s,
+    ("slh_dsa") SlhDsaPureShake128f: OQS_SIG_alg_slh_dsa_pure_shake_128f,
+    ("slh_dsa") SlhDsaPureShake192s: OQS_SIG_alg_slh_dsa_pure_shake_192s,
+    ("slh_dsa") SlhDsaPureShake192f: OQS_SIG_alg_slh_dsa_pure_shake_192f,
+    ("slh_dsa") SlhDsaPureShake256s: OQS_SIG_alg_slh_dsa_pure_shake_256s,
+    ("slh_dsa") SlhDsaPureShake256f: OQS_SIG_alg_slh_dsa_pure_shake_256f,
     ("sphincs") SphincsSha2128fSimple: OQS_SIG_alg_sphincs_sha2_128f_simple,
     ("sphincs") SphincsSha2128sSimple: OQS_SIG_alg_sphincs_sha2_128s_simple,
     ("sphincs") SphincsSha2192fSimple: OQS_SIG_alg_sphincs_sha2_192f_simple,
@@ -273,9 +285,9 @@ impl Algorithm {
 /// # Example
 /// ```rust
 /// # if !cfg!(feature = "ml_dsa") { return; }
-/// use oqs;
-/// oqs::init();
-/// let scheme = oqs::sig::Sig::new(oqs::sig::Algorithm::MlDsa44).unwrap();
+/// use tectonic_oqs;
+/// tectonic_oqs::init();
+/// let scheme = tectonic_oqs::sig::Sig::new(tectonic_oqs::sig::Algorithm::MlDsa44).unwrap();
 /// let message = [0u8; 100];
 /// let (pk, sk) = scheme.keypair().unwrap();
 /// let signature = scheme.sign(&message, &sk).unwrap();

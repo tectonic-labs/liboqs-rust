@@ -247,9 +247,9 @@ impl std::fmt::Display for Algorithm {
 /// # Example
 /// ```rust
 /// # if !cfg!(feature = "ml_kem") { return; }
-/// use oqs;
-/// oqs::init();
-/// let kem = oqs::kem::Kem::new(oqs::kem::Algorithm::MlKem512).unwrap();
+/// use tectonic_oqs;
+/// tectonic_oqs::init();
+/// let kem = tectonic_oqs::kem::Kem::new(tectonic_oqs::kem::Algorithm::MlKem512).unwrap();
 /// let (pk, sk) = kem.keypair().unwrap();
 /// let (ct, ss) = kem.encapsulate(&pk).unwrap();
 /// let ss2 = kem.decapsulate(&sk, &ct).unwrap();

@@ -8,10 +8,10 @@
 //!
 //! This protocol has no replay protection!
 //! ```
-//! use oqs::*;
+//! use tectonic_oqs::*;
 //! # #[cfg(all(feature = "ml_dsa", feature = "ml_kem"))]
 //! fn main() -> Result<()> {
-//!     oqs::init(); // Important: initialize liboqs
+//!     tectonic_oqs::init(); // Important: initialize liboqs
 //!     let sigalg = sig::Sig::new(sig::Algorithm::MlDsa44)?;
 //!     let kemalg = kem::Kem::new(kem::Algorithm::MlKem512)?;
 //!     // A's long-term secrets
@@ -24,12 +24,12 @@
 //!
 //!     // A -> B: kem_pk, signature
 //!     let (kem_pk, kem_sk) = kemalg.keypair()?;
-//!     let signature = sigalg.sign(kem_pk.as_ref(), &a_sig_sk)?;
+//!     let signature = sigalg.sign(kem_pk.as_ref() as &[u8], &a_sig_sk)?;
 //!
 //!     // B -> A: kem_ct, signature
 //!     sigalg.verify(kem_pk.as_ref(), &signature, &a_sig_pk)?;
 //!     let (kem_ct, b_kem_ss) = kemalg.encapsulate(&kem_pk)?;
-//!     let signature = sigalg.sign(kem_ct.as_ref(), &b_sig_sk)?;
+//!     let signature = sigalg.sign(kem_ct.as_ref() as &[u8], &b_sig_sk)?;
 //!
 //!     // A verifies, decapsulates, now both have kem_ss
 //!     sigalg.verify(kem_ct.as_ref(), &signature, &b_sig_pk)?;

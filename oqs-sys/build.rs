@@ -24,10 +24,14 @@ fn try_parse_gitmodules() -> Option<(String, String)> {
             continue;
         }
         if in_liboqs_section {
-            if let Some(value) = line.strip_prefix("url = ").or_else(|| line.strip_prefix("url=")) {
+            if let Some(value) = line
+                .strip_prefix("url = ")
+                .or_else(|| line.strip_prefix("url="))
+            {
                 url = Some(value.trim().to_string());
-            } else if let Some(value) =
-                line.strip_prefix("branch = ").or_else(|| line.strip_prefix("branch="))
+            } else if let Some(value) = line
+                .strip_prefix("branch = ")
+                .or_else(|| line.strip_prefix("branch="))
             {
                 branch = Some(value.trim().to_string());
             }
@@ -40,17 +44,16 @@ fn try_parse_gitmodules() -> Option<(String, String)> {
     Some((url, branch))
 }
 
-/// Parses [package.metadata.liboqs] from Cargo.toml to get URL and branch.
+/// Parses [package.metadata.liboqs] from Cargo.toml to get URL and git ref (branch or tag).
 /// This is used when .gitmodules is not available (e.g., crates.io builds).
 fn parse_cargo_metadata() -> (String, String) {
     let manifest_dir = PathBuf::from(std::env::var("CARGO_MANIFEST_DIR").unwrap());
     let cargo_toml_path = manifest_dir.join("Cargo.toml");
 
-    let contents = std::fs::read_to_string(&cargo_toml_path)
-        .expect("Failed to read Cargo.toml");
+    let contents = std::fs::read_to_string(&cargo_toml_path).expect("Failed to read Cargo.toml");
 
     let mut url = None;
-    let mut branch = None;
+    let mut git_ref = None;
     let mut in_metadata_section = false;
 
     for line in contents.lines() {
@@ -64,20 +67,27 @@ fn parse_cargo_metadata() -> (String, String) {
             continue;
         }
         if in_metadata_section {
-            if let Some(value) = line.strip_prefix("url = ").or_else(|| line.strip_prefix("url=")) {
-                url = Some(value.trim().trim_matches('"').to_string());
-            } else if let Some(value) =
-                line.strip_prefix("branch = ").or_else(|| line.strip_prefix("branch="))
+            if let Some(value) = line
+                .strip_prefix("url = ")
+                .or_else(|| line.strip_prefix("url="))
             {
-                branch = Some(value.trim().trim_matches('"').to_string());
+                url = Some(value.trim().trim_matches('"').to_string());
+            } else if let Some(value) = line
+                .strip_prefix("tag = ")
+                .or_else(|| line.strip_prefix("tag="))
+                .or_else(|| line.strip_prefix("branch = "))
+                .or_else(|| line.strip_prefix("branch="))
+            {
+                git_ref = Some(value.trim().trim_matches('"').to_string());
             }
         }
     }
 
     let url = url.expect("Could not find 'url' in [package.metadata.liboqs] in Cargo.toml");
-    let branch = branch.expect("Could not find 'branch' in [package.metadata.liboqs] in Cargo.toml");
+    let git_ref = git_ref
+        .expect("Could not find 'tag' or 'branch' in [package.metadata.liboqs] in Cargo.toml");
 
-    (url, branch)
+    (url, git_ref)
 }
 
 /// Gets the liboqs repository URL and branch.
@@ -261,6 +271,7 @@ fn build_from_source(liboqs_src: &Path) -> PathBuf {
     algorithm_feature!("SIG", "falcon");
     algorithm_feature!("SIG", "mayo");
     algorithm_feature!("SIG", "ml_dsa");
+    algorithm_feature!("SIG", "slh_dsa");
     algorithm_feature!("SIG", "sphincs");
     algorithm_feature!("SIG", "uov");
 
@@ -298,7 +309,25 @@ fn build_from_source(liboqs_src: &Path) -> PathBuf {
         if let Ok(dir) = std::env::var("OPENSSL_ROOT_DIR") {
             let dir = Path::new(&dir).join("lib");
             println!("cargo:rustc-link-search={}", dir.display());
-        } else if cfg!(target_os = "windows") || cfg!(target_os = "macos") {
+        } else if cfg!(target_os = "macos") {
+            // Try to find OpenSSL via Homebrew on macOS
+            if let Ok(output) = Command::new("brew").args(["--prefix", "openssl"]).output() {
+                if output.status.success() {
+                    let prefix = String::from_utf8_lossy(&output.stdout).trim().to_string();
+                    let lib_dir = Path::new(&prefix).join("lib");
+                    if lib_dir.exists() {
+                        config.define("OPENSSL_ROOT_DIR", &prefix);
+                        println!("cargo:rustc-link-search={}", lib_dir.display());
+                    } else {
+                        println!("cargo:warning=You may need to specify OPENSSL_ROOT_DIR or disable the default `openssl` feature.");
+                    }
+                } else {
+                    println!("cargo:warning=You may need to specify OPENSSL_ROOT_DIR or disable the default `openssl` feature.");
+                }
+            } else {
+                println!("cargo:warning=You may need to specify OPENSSL_ROOT_DIR or disable the default `openssl` feature.");
+            }
+        } else if cfg!(target_os = "windows") {
             println!("cargo:warning=You may need to specify OPENSSL_ROOT_DIR or disable the default `openssl` feature.");
         }
     }

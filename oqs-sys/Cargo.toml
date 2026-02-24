@@ -41,18 +41,19 @@ kyber = []
 ml_kem = []
 ntruprime = []
 # algorithms: Signature schemes
-sigs = ["cross", "dilithium", "falcon", "mayo", "ml_dsa", "sphincs", "uov"]
+sigs = ["cross", "dilithium", "falcon", "mayo", "ml_dsa", "slh_dsa", "sphincs", "uov"]
 cross = []
 dilithium = []
 falcon = []
 mayo = []
 ml_dsa = []
+slh_dsa = []
 sphincs = []
 uov = []
 
 [package.metadata.liboqs]
 url = "https://github.com/tectonic-labs/liboqs.git"
-branch = "main"
+tag = "tectonic/v0.15.1"
 
 [package.metadata.docs.rs]
 features = ["docs"]
